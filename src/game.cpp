@@ -5,7 +5,9 @@
 #include <cstring>
 #include <sstream>
 #include <fstream>
+#include <vector>
 
+using std::vector;
 using std::runtime_error;
 using std::string;
 using std::cout;
@@ -82,9 +84,6 @@ init_shaders() {
   GLuint vertex_shader = compile_shader<TYPE_VERTEX_SHADER>();
   GLuint fragment_shader = compile_shader<TYPE_FRAGMENT_SHADER>();
 
-  cerr << "vertex shader: " << vertex_shader << endl;
-  cerr << "fragment shader: " << vertex_shader << endl;
-
   if (vertex_shader == 0 || fragment_shader == 0)
     return false;
 
@@ -107,7 +106,6 @@ init_shaders() {
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
 
-  cerr << "shader program: " << shader_program << endl;
   return shader_program;
 }
 
@@ -121,18 +119,54 @@ glClearColor255(const int r, const int g, const int b, const int a) {
   );
 }
 
+inline void
+init_vertex_buffer(GLuint &vertex_array_object,
+                   GLuint &vertex_buffer_object,
+                   GLuint &element_buffer_object) {
+  // generate
+  glGenVertexArrays(1, &vertex_array_object);
+  glGenBuffers(1, &vertex_buffer_object);
+  glGenBuffers(1, &element_buffer_object);
+
+  // bind
+  glBindVertexArray(vertex_array_object);
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object);
+}
+
+void
+load_vertices(const vector<float> &vertices,
+              const vector<uint32_t> &indices) {
+  glBufferData(GL_ARRAY_BUFFER, vertices.size()*sizeof(float), vertices.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size()*sizeof(uint32_t), indices.data(), GL_STATIC_DRAW);
+}
+
+inline void
+postprocess_vertex_buffer() {
+  // coordinates attribute (location = 0 on vertex.shader)
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*) 0);
+  glEnableVertexAttribArray(0);
+
+  // color attribute (location = 1 on vertex.shader)
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*) (3*sizeof(float)));
+  glEnableVertexAttribArray(1);
+}
+
 int
 main(int argc, const char **argv) {
   static const size_t SCREEN_WIDTH = 1024;
   static const size_t SCREEN_HEIGHT = 768;
+  static const string GAME_NAME = "First Game";
+
+  const bool wireframe_mode = (argc > 1 && strcmp(argv[1], "wireframe") == 0);
   glfwInit();
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   GLFWwindow *window = glfwCreateWindow(
-    SCREEN_WIDTH, SCREEN_HEIGHT,
-    "First Game", NULL, NULL
+    SCREEN_WIDTH, SCREEN_HEIGHT, GAME_NAME.c_str(),
+    NULL, NULL
   );
 
   // init window
@@ -158,47 +192,43 @@ main(int argc, const char **argv) {
     throw runtime_error("Failed to compile shaders!");
   }
 
+  GLuint vertex_array_object = 0;
+  GLuint vertex_buffer_object = 0;
+  GLuint element_buffer_object = 0;
+  init_vertex_buffer(vertex_array_object,
+                     vertex_buffer_object,
+                     element_buffer_object);
+
+  if (vertex_array_object == 0 ||
+      vertex_buffer_object == 0 ||
+      element_buffer_object == 0) {
+    glfwTerminate();
+    throw runtime_error("Failed to init vertex buffer");
+  }
+
   // triangle
-  const float vertices[] = {
-    -0.5f, -0.5f, 0.f,
-     0.5f, -0.5f, 0.f,
-    -0.5f,  0.5f, 0.f,
-     0.5f,  0.5f, 0.5f,
+  vector<float> square = {
+    -0.5f, -0.5f, 0.f, 0.5f, 0.f, 0.f,
+     0.5f, -0.5f, 0.f, 0.5f, 0.5f, 0.5f,
+    -0.5f,  0.5f, 0.f, 0.5f, 0.5f, 0.f,
+     0.5f,  0.5f, 0.5f, 0.5f, 0.5f, 0.5f
   };
 
-  uint32_t indices[] = {
+  vector<uint32_t> square_indices = {
     0, 1, 2,
     1, 2, 3
   };
 
-  GLuint vertex_buffer_object;
-  GLuint vertex_array_object;
-  GLuint element_buffer_object;
+  load_vertices(square, square_indices);
+  postprocess_vertex_buffer();
 
-  // generate
-  glGenVertexArrays(1, &vertex_array_object);
-  glGenBuffers(1, &vertex_buffer_object);
-  glGenBuffers(1, &element_buffer_object);
 
-  // bind
-  glBindVertexArray(vertex_array_object);
-
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_object);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer_object);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-  // vertex array
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*) 0);
-  glEnableVertexAttribArray(0);
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindVertexArray(0);
-
-  if (argc > 1 && strcmp(argv[1], "wireframe") == 0) {
+  if (wireframe_mode) {
     cerr << "running in wireframe mode" << endl;
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   }
+
+  glUseProgram(shader_program);
   while (!glfwWindowShouldClose(window)) {
     // inputs
     process_input(window);
@@ -208,7 +238,6 @@ main(int argc, const char **argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // draw
-    glUseProgram(shader_program);
     glBindVertexArray(vertex_array_object);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
