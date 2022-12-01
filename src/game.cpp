@@ -7,6 +7,9 @@
 #include <fstream>
 #include <vector>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 using std::vector;
 using std::runtime_error;
 using std::string;
@@ -17,10 +20,31 @@ using std::ifstream;
 using std::ostringstream;
 using std::to_string;
 
+struct tex_image {
+  int w;
+  int h;
+  int nch;
+  unsigned int texture;
+  unsigned char *data;
+
+  tex_image() : w(0), h(0), nch(0), data(nullptr) {}
+  void load(const string filename) {
+    data = stbi_load(filename.c_str(), &w, &h, &nch, 0);
+    if (!data) {
+      throw runtime_error("attempted to load non-existant image file: " + filename);
+    }
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+  }
+
+  void unload() {
+    stbi_image_free(data);
+  }
+};
+
 // resize window on drag
 void
 framebuffer_size_callback(GLFWwindow *window, const int w, const int h) {
-  cerr << "window has been resized!" << endl;
   glViewport(0, 0, w, h);
 }
 
@@ -145,12 +169,34 @@ load_vertices(const vector<float> &vertices,
 inline void
 postprocess_vertex_buffer() {
   // coordinates attribute (location = 0 on vertex.shader)
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*) 0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*) 0);
   glEnableVertexAttribArray(0);
 
   // color attribute (location = 1 on vertex.shader)
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*) (3*sizeof(float)));
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*) (6*sizeof(float)));
   glEnableVertexAttribArray(1);
+
+  // texture coord attribute
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*) (6*sizeof(float)));
+  glEnableVertexAttribArray(2);
+}
+
+inline void
+init_textures() {
+  // repeat pattern if overflows in S and T coordinates
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  // minimap
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
+inline void
+set_texture(const tex_image &tx) {
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tx.w, tx.h, 0, GL_RGB, GL_UNSIGNED_BYTE, tx.data);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, tx.texture);
 }
 
 int
@@ -207,12 +253,17 @@ main(int argc, const char **argv) {
     throw runtime_error("Failed to init vertex buffer");
   }
 
+  init_textures();
+
+  tex_image tx_container;
+  tx_container.load("container.jpg");
+
   // triangle
   vector<float> square = {
-    -0.5f, -0.5f, 0.f, 0.5f, 0.f, 0.f,
-     0.5f, -0.5f, 0.f, 0.5f, 0.5f, 0.5f,
-    -0.5f,  0.5f, 0.f, 0.5f, 0.5f, 0.f,
-     0.5f,  0.5f, 0.5f, 0.5f, 0.5f, 0.5f
+    -0.5f, -0.5f, 0.f, 0.5f, 0.5f, 0.5f, 0.f, 0.f,
+     0.5f, -0.5f, 0.f, 0.5f, 0.5f, 0.5f, 1.f, 0.f,
+    -0.5f,  0.5f, 0.f, 0.5f, 0.5f, 0.5f, 0.f, 1.f,
+     0.5f,  0.5f, 0.f, 0.5f, 0.5f, 0.5f, 1.f, 1.f
   };
 
   vector<uint32_t> square_indices = {
@@ -239,6 +290,7 @@ main(int argc, const char **argv) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // draw
+    set_texture(tx_container);
     glBindVertexArray(vertex_array_object);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -247,6 +299,7 @@ main(int argc, const char **argv) {
     glfwPollEvents();
   }
 
+  tx_container.unload();
   glDeleteVertexArrays(1, &vertex_array_object);
   glDeleteBuffers(1, &vertex_buffer_object);
   glDeleteBuffers(1, &element_buffer_object);
