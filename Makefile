@@ -3,7 +3,7 @@ CXX = g++
 CXXFLAGS = -O3 -Wall
 CPPFLAGS = # includes etc
 LDFLAGS = # linkers etc
-LDLIBS = -ldl -lglfw
+LDLIBS = -ldl -lglfw3
 all: game
 
 # Need glfw from here: https://github.com/glfw/glfw
