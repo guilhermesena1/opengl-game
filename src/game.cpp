@@ -24,16 +24,45 @@ struct tex_image {
   int w;
   int h;
   int nch;
+  GLuint rgb;
+  GLuint num;
   unsigned int texture;
   unsigned char *data;
 
   tex_image() : w(0), h(0), nch(0), data(nullptr) {}
-  void load(const string filename) {
+
+
+  static void minimap_setup() {
+    // repeat pattern if overflows in S and T coordinates
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    // minimap
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  }
+
+  void load(const string filename, const GLuint _rgb, const GLuint _num) {
+    rgb = _rgb;
+    num = _num;
+
+    // setup
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    minimap_setup();
+
+    // load image data
+    stbi_set_flip_vertically_on_load(true);
     data = stbi_load(filename.c_str(), &w, &h, &nch, 0);
     if (!data) {
       throw runtime_error("attempted to load non-existant image file: " + filename);
     }
-    glGenTextures(1, &texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, rgb, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+
+  inline void bind() {
+    glActiveTexture(num);
     glBindTexture(GL_TEXTURE_2D, texture);
   }
 
@@ -181,23 +210,6 @@ postprocess_vertex_buffer() {
   glEnableVertexAttribArray(2);
 }
 
-inline void
-init_textures() {
-  // repeat pattern if overflows in S and T coordinates
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-  // minimap
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-}
-
-inline void
-set_texture(const tex_image &tx) {
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tx.w, tx.h, 0, GL_RGB, GL_UNSIGNED_BYTE, tx.data);
-  glGenerateMipmap(GL_TEXTURE_2D);
-  glBindTexture(GL_TEXTURE_2D, tx.texture);
-}
 
 int
 main(int argc, const char **argv) {
@@ -253,10 +265,10 @@ main(int argc, const char **argv) {
     throw runtime_error("Failed to init vertex buffer");
   }
 
-  init_textures();
-
   tex_image tx_container;
-  tx_container.load("container.jpg");
+  tex_image tx_face;
+  tx_container.load("container.jpg", GL_RGB, GL_TEXTURE0);
+  tx_face.load("awesomeface.png", GL_RGBA, GL_TEXTURE1);
 
   // triangle
   vector<float> square = {
@@ -281,6 +293,9 @@ main(int argc, const char **argv) {
   }
 
   glUseProgram(shader_program);
+  glUniform1i(glGetUniformLocation(shader_program, "texture1"), 0);
+  glUniform1i(glGetUniformLocation(shader_program, "texture2"), 1);
+
   while (!glfwWindowShouldClose(window)) {
     // inputs
     process_input(window);
@@ -289,8 +304,11 @@ main(int argc, const char **argv) {
     glClearColor255(42, 94, 140, 255);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // texture
+    tx_container.bind();
+    tx_face.bind();
+
     // draw
-    set_texture(tx_container);
     glBindVertexArray(vertex_array_object);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -299,7 +317,10 @@ main(int argc, const char **argv) {
     glfwPollEvents();
   }
 
+  // free textures
   tx_container.unload();
+  tx_face.unload();
+
   glDeleteVertexArrays(1, &vertex_array_object);
   glDeleteBuffers(1, &vertex_buffer_object);
   glDeleteBuffers(1, &element_buffer_object);
