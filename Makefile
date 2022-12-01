@@ -1,20 +1,10 @@
-PROGS = game
-CXX = g++
-CXXFLAGS = -O3 -Wall
-CPPFLAGS = # includes etc
-LDFLAGS = # linkers etc
-LDLIBS = -ldl -lglfw3
-all: game
+SRC_ROOT=$(shell pwd)
+all:
+	@make -C src SRC_ROOT=$(SRC_ROOT) all
 
-# Need glfw from here: https://github.com/glfw/glfw
-
-all : $(PROGS)
-
-game: src/game.cpp src/glad.c src/glad.h
-	$(CXX) $(CXXFLAGS) -o $@  $^ $(CPPFLAGS) $(LDLIBS) $(LDFLAGS)
+install:
+	@make -C src SRC_ROOT=$(SRC_ROOT) install
 
 clean:
-	@-rm -f $(PROGS) *.o *.so *.a *~
-
+	@make -C src clean
 .PHONY: clean
-

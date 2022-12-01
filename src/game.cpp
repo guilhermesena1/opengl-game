@@ -15,6 +15,7 @@ using std::cerr;
 using std::endl;
 using std::ifstream;
 using std::ostringstream;
+using std::to_string;
 
 // resize window on drag
 void
@@ -39,7 +40,7 @@ read_file_to_string(const string &fn, const size_t array_size, char *str) {
   oss << in.rdbuf();
 
   if (oss.str().size() > array_size)
-    throw runtime_error("file size exceeds 65536: " + fn);
+    throw runtime_error("file size exceeds " + to_string(array_size) + ": " + fn);
 
   strcpy(str, oss.str().c_str());
 }
@@ -99,7 +100,7 @@ init_shaders() {
   glGetShaderiv(shader_program, GL_LINK_STATUS, &success);
   if (!success) {
     glGetProgramInfoLog(shader_program, 512, NULL, info_log);
-    cerr << "problem with linking shader to program" << info_log << endl;
+    cerr << "problem with linking shader to program: " << info_log << endl;
     return 0;
   }
 
