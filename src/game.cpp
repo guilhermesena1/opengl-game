@@ -27,7 +27,7 @@ framebuffer_size_callback(GLFWwindow *window, const int w, const int h) {
 void
 process_input(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, true);
+    glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 void
@@ -51,7 +51,7 @@ GLuint
 compile_shader() {
   // init shader
   static const size_t MAX_FILE_SIZE = 65536;
-  char *shader_source = (char*)malloc(MAX_FILE_SIZE*sizeof(char));
+  GLchar *shader_source = (char*)malloc(MAX_FILE_SIZE*sizeof(char));
 
   GLuint shader;
   if (type == TYPE_VERTEX_SHADER) {
@@ -86,7 +86,7 @@ init_shaders() {
   GLuint fragment_shader = compile_shader<TYPE_FRAGMENT_SHADER>();
 
   if (vertex_shader == 0 || fragment_shader == 0)
-    return false;
+    return GL_FALSE;
 
   GLuint shader_program = glCreateProgram();
 
