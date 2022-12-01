@@ -14,10 +14,27 @@ sudo apt-get install libglew-dev libglfw3-dev libglm-dev
 sudo apt-get install libao-dev libmpg123-dev
 ```
 
-Then install the `glfw` directory by doing:
+# Installing glfw
+
+We need this to setup the OpenGL window more easily
+
+Install the `glfw` directory by doing:
 
 ```
 cd glfw
+cmake .
+make
+sudo make install
+```
+
+# Installing glm
+
+We use this for matrix operations
+
+Install `glm` through the following commands
+
+```
+cd glm
 cmake .
 make
 sudo make install

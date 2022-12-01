@@ -7,8 +7,11 @@
 #include <fstream>
 #include <vector>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#include "stb_image_wrapper.h"
 
 using std::vector;
 using std::runtime_error;
